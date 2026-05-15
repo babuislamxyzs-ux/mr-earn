@@ -1,0 +1,8 @@
+{
+  "name": "Timewell Earn",
+  "description": "A premium professional online earning platform with TimeWall API integration, real-time tracking, and multi-level referral systems.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

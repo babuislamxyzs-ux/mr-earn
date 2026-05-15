@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Core user data including balance and role.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "balance": { "type": "number" },
+        "totalEarned": { "type": "number" },
+        "referralCode": { "type": "string" },
+        "referredBy": { "type": "string" },
+        "xp": { "type": "number" },
+        "level": { "type": "number" },
+        "country": { "type": "string" },
+        "lastLogin": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "email", "role", "balance", "referralCode"]
+    },
+    "Transaction": {
+      "title": "Transaction Log",
+      "description": "Records of all balance changes.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["earn", "withdraw", "bonus", "referral"] },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["userId", "amount", "type", "status", "timestamp"]
+    },
+    "Withdrawal": {
+      "title": "Withdrawal Request",
+      "description": "User requests to cash out.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "details": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "fee": { "type": "number" },
+        "netAmount": { "type": "number" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["userId", "amount", "method", "status", "timestamp"]
+    },
+    "Notification": {
+      "title": "User Notification",
+      "description": "Alerts for the user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
+        "read": { "type": "boolean" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["userId", "title", "message", "read", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User documents indexed by UID."
+    },
+    "transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Global transactions log."
+    },
+    "withdrawals/{withdrawalId}": {
+      "schema": "Withdrawal",
+      "description": "All withdrawal requests."
+    },
+    "notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User specific notifications."
+    }
+  }
+}

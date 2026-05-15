@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ---------------------------------------------------------
+    // HELPERS
+    // ---------------------------------------------------------
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // ---------------------------------------------------------
+    // GLOBAL DENY
+    // ---------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------
+    // USERS COLLECTION
+    // ---------------------------------------------------------
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.uid == request.auth.uid 
+          && data.email is string && data.email.size() <= 100
+          && (data.displayName == null || (data.displayName is string && data.displayName.size() <= 100))
+          && data.role in ["user", "admin"]
+          && data.balance is number
+          && data.totalEarned is number
+          && data.referralCode is string && data.referralCode.size() <= 50
+          && data.xp is number
+          && data.level is number
+          && data.createdAt is number
+          && (data.lastLogin == null || data.lastLogin is number);
+      }
+
+      // Users can read their own profile
+      allow get: if isOwner(userId) || isAdmin();
+      
+      // Admin can list users
+      allow list: if isAdmin();
+
+      // Create profile on registration
+      allow create: if isOwner(userId) 
+        && isValidUser(incoming())
+        && incoming().role == "user" // Force user role
+        && incoming().balance == 0   // Force 0 balance
+        && incoming().totalEarned == 0;
+
+      // Update profile
+      allow update: if (isOwner(userId) && (
+        // Action: Update metadata (displayName, photo, etc)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastLogin', 'country']))
+      )) || isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // TRANSACTIONS
+    // ---------------------------------------------------------
+    match /transactions/{transactionId} {
+      function isValidTransaction(data) {
+        return data.userId is string && data.amount is number 
+          && data.type in ["earn", "withdraw", "bonus", "referral"]
+          && data.status in ["pending", "completed", "failed"]
+          && data.timestamp is number;
+      }
+
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      // Transactions are system-generated (via postback or admin)
+      // Only admin can write directly
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // WITHDRAWALS
+    // ---------------------------------------------------------
+    match /withdrawals/{withdrawalId} {
+      function isValidWithdrawal(data) {
+        return data.userId == request.auth.uid
+          && data.amount is number && data.amount > 0
+          && data.method is string && data.method.size() <= 50
+          && data.status == "pending"
+          && data.timestamp is number;
+      }
+
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() 
+        && isValidWithdrawal(incoming())
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.balance >= incoming().amount;
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // NOTIFICATIONS
+    // ---------------------------------------------------------
+    match /notifications/{notificationId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      // User can mark as read
+      allow update: if isOwner(existing().userId) 
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      
+      allow create, delete: if isAdmin();
+    }
+  }
+}
